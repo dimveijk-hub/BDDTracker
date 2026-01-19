@@ -1,0 +1,5 @@
+{
+  "name": "Sales Appointment Tracker",
+  "description": "A professional real-time dashboard for sales teams to track appointment setting progress, with admin-controlled 'Call Day' locking and team-based target logic.",
+  "requestFramePermissions": []
+}
