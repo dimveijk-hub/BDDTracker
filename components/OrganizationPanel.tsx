@@ -1,52 +1,82 @@
+import React, { useMemo, useState } from 'react';
+import { api } from '../services';
+import { type Profile, type Team, UserRole } from '../types';
+import { formatName } from '../utils/format';
+import { TrashIcon } from './icons';
 
-import React, { useState } from 'react';
-import { Profile, Team, UserRole } from '../types';
-
-interface OrganizationPanelProps {
+interface Props {
   profiles: Profile[];
   teams: Team[];
-  onUpdateProfiles: (profiles: Profile[]) => void;
-  onUpdateTeams: (teams: Team[]) => void;
 }
 
-export const OrganizationPanel: React.FC<OrganizationPanelProps> = ({ profiles, teams, onUpdateProfiles, onUpdateTeams }) => {
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState<UserRole>(UserRole.BELLER);
-  const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id || '');
-  const [newTeamName, setNewTeamName] = useState('');
+const inputClass =
+  'w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-red-100 transition-all';
+const labelClass = 'text-[10px] font-black text-slate-400 ml-1';
 
-  const handleAddUser = (e: React.FormEvent) => {
+export const OrganizationPanel: React.FC<Props> = ({ profiles, teams }) => {
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<UserRole>(UserRole.BELLER);
+  const [teamName, setTeamName] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+
+  const sortedProfiles = useMemo(
+    () => [...profiles].sort((a, b) => formatName(a.email).localeCompare(formatName(b.email), undefined, { sensitivity: 'base' })),
+    [profiles],
+  );
+
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserEmail) return;
-    const newUser: Profile = {
-      id: Math.random().toString(36).substr(2, 9),
-      email: newUserEmail,
-      role: newUserRole,
-      team_id: newUserRole === UserRole.BELLER ? selectedTeamId : null
-    };
-    onUpdateProfiles([...profiles, newUser]);
-    setNewUserEmail('');
+    if (!inviteEmail) return;
+    setInviting(true);
+    setInviteError(null);
+    setInviteSuccess(null);
+    try {
+      await api.inviteUser(inviteEmail, inviteRole, null);
+      setInviteSuccess(`Uitnodiging verstuurd naar ${inviteEmail}`);
+      setInviteEmail('');
+      setTimeout(() => setInviteSuccess(null), 5000);
+    } catch (err) {
+      setInviteError((err as Error).message || 'Kon gebruiker niet uitnodigen');
+    } finally {
+      setInviting(false);
+    }
   };
 
-  const handleAddTeam = (e: React.FormEvent) => {
+  const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTeamName.trim()) return;
-    const newTeam: Team = {
-      id: 't' + (teams.length + 1) + Math.random().toString(36).substr(2, 4),
-      name: newTeamName.trim()
-    };
-    onUpdateTeams([...teams, newTeam]);
-    setNewTeamName('');
-    if (!selectedTeamId) setSelectedTeamId(newTeam.id);
+    if (!teamName.trim()) return;
+    try {
+      await api.createTeam(teamName.trim());
+      setTeamName('');
+    } catch (err) {
+      console.error('Error creating team:', err);
+      alert('Kon team niet aanmaken: ' + (err as Error).message);
+    }
   };
 
-  const updateUserTeam = (userId: string, teamId: string) => {
-    onUpdateProfiles(profiles.map(p => p.id === userId ? { ...p, team_id: teamId } : p));
+  const handleTeamChange = async (profileId: string, teamId: string) => {
+    try {
+      await api.updateProfile(profileId, { team_id: teamId || null });
+    } catch (err) {
+      console.error('Error updating user team:', err);
+      alert('Kon team niet updaten: ' + (err as Error).message);
+    }
   };
 
-  const deleteUser = (userId: string) => {
-    if (confirm('Gebruiker definitief verwijderen?')) {
-      onUpdateProfiles(profiles.filter(p => p.id !== userId));
+  const handleDelete = async (profileId: string) => {
+    if (
+      !confirm(
+        `Weet je zeker dat je deze gebruiker wilt verwijderen? Hun toegang tot de app wordt direct geblokkeerd.\n\nLet op: Ze blijven zichtbaar in Firebase Auth totdat je ze daar handmatig verwijdert.`,
+      )
+    )
+      return;
+    try {
+      await api.deleteProfile(profileId);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert('Kon gebruiker niet verwijderen: ' + (err as Error).message);
     }
   };
 
@@ -56,58 +86,78 @@ export const OrganizationPanel: React.FC<OrganizationPanelProps> = ({ profiles, 
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <div>
-              <h3 className="font-black uppercase tracking-tight text-slate-800">Gebruikersbeheer</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Organisatie structuur</p>
+              <h3 className="font-black text-slate-800">Gebruikersbeheer</h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-0.5">Organisatie structuur</p>
             </div>
-            <span className="text-[10px] font-black bg-red-50 text-[#e72b47] px-3 py-1 rounded-full uppercase">{profiles.length} Accounts</span>
+            <span className="text-[10px] font-black bg-red-50 text-[#E62C48] px-3 py-1 rounded-full">
+              {profiles.length} accounts
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="bg-white text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
+              <thead className="bg-white text-[10px] font-black text-slate-400 border-b">
                 <tr>
                   <th className="px-6 py-4">Gebruiker</th>
                   <th className="px-6 py-4">Rol</th>
-                  <th className="px-6 py-4">Team Toewijzing</th>
+                  <th className="px-6 py-4">Team toewijzing</th>
                   <th className="px-6 py-4 text-right">Actie</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {profiles.map(p => (
-                  <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${p.role === UserRole.ADMIN ? 'bg-purple-50 text-purple-600' : 'bg-red-50 text-[#e72b47]'}`}>
-                          {p.email[0].toUpperCase()}
+                {sortedProfiles.map((profile) => {
+                  const isAdmin = profile.role === UserRole.ADMIN;
+                  return (
+                    <tr key={profile.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${
+                              isAdmin ? 'bg-purple-50 text-purple-600' : 'bg-red-50 text-[#E62C48]'
+                            }`}
+                          >
+                            {profile.email[0].toUpperCase()}
+                          </div>
+                          <span className="font-bold text-sm text-slate-700">{formatName(profile.email)}</span>
                         </div>
-                        <span className="font-bold text-sm text-slate-700">{p.email}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md ${p.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-700' : 'bg-red-100 text-[#e72b47]'}`}>
-                        {p.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {p.role === UserRole.BELLER ? (
-                        <select 
-                          value={p.team_id || ''} 
-                          onChange={(e) => updateUserTeam(p.id, e.target.value)}
-                          className="text-xs font-bold bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 focus:ring-2 focus:ring-[#e72b47] outline-none cursor-pointer text-slate-600"
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`text-[9px] font-black px-2 py-1 rounded-md ${
+                            isAdmin ? 'bg-purple-100 text-purple-700' : 'bg-red-100 text-[#E62C48]'
+                          }`}
                         >
-                          <option value="">Geen team</option>
-                          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                      ) : (
-                        <span className="text-[10px] font-black text-slate-300 uppercase italic">N.v.t.</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button onClick={() => deleteUser(p.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                          {profile.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {profile.role === UserRole.BELLER ? (
+                          <select
+                            value={profile.team_id || ''}
+                            onChange={(e) => handleTeamChange(profile.id, e.target.value)}
+                            className="text-xs font-bold bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 focus:ring-2 focus:ring-[#E62C48] outline-none cursor-pointer text-slate-600"
+                          >
+                            <option value="">Geen team</option>
+                            {teams.map((team) => (
+                              <option key={team.id} value={team.id}>
+                                {team.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-[10px] font-black text-slate-300 italic">n.v.t.</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => handleDelete(profile.id)}
+                          className="p-2 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -117,88 +167,91 @@ export const OrganizationPanel: React.FC<OrganizationPanelProps> = ({ profiles, 
       <div className="space-y-6">
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
           <div className="mb-6">
-            <h4 className="font-black uppercase tracking-tight text-slate-800 text-sm">Nieuwe Gebruiker</h4>
-            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Direct toevoegen aan team</p>
+            <h4 className="font-black text-slate-800 text-sm">Nieuwe gebruiker</h4>
+            <p className="text-[10px] text-slate-400 font-bold mt-1">Voeg account toe aan de lijst</p>
           </div>
-          <form onSubmit={handleAddUser} className="space-y-5">
+          <form onSubmit={handleInvite} className="space-y-5">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mailadres</label>
-              <input 
-                type="email" 
+              <label className={labelClass}>E-mailadres</label>
+              <input
+                type="email"
                 required
-                placeholder="naam@bedrijf.nl" 
-                value={newUserEmail} 
-                onChange={e => setNewUserEmail(e.target.value)} 
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-red-100 transition-all" 
+                placeholder="naam@saleswise.eu"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                className={inputClass}
               />
             </div>
-            
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Rol</label>
-              <select 
-                value={newUserRole} 
-                onChange={e => setNewUserRole(e.target.value as UserRole)} 
+              <label className={labelClass}>Rol</label>
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as UserRole)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none cursor-pointer"
               >
                 <option value={UserRole.BELLER}>Beller</option>
                 <option value={UserRole.ADMIN}>Administrator</option>
               </select>
             </div>
-
-            {newUserRole === UserRole.BELLER && (
-              <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Standaard Team</label>
-                <select 
-                  value={selectedTeamId} 
-                  onChange={e => setSelectedTeamId(e.target.value)} 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none cursor-pointer"
-                >
-                  <option value="">Selecteer een team...</option>
-                  {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
+            {inviteError && (
+              <p className="text-xs font-bold text-[#E62C48] bg-red-50 p-3 rounded-xl border border-red-100">{inviteError}</p>
             )}
-
-            <button type="submit" className="w-full bg-[#e72b47] text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-red-100 hover:bg-[#d1263f] hover:-translate-y-0.5 transition-all active:scale-95 mt-4">
-              Gebruiker Aanmaken
+            {inviteSuccess && (
+              <p className="text-xs font-bold text-green-600 bg-green-50 p-3 rounded-xl border border-green-100">
+                {inviteSuccess}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={inviting}
+              className={`w-full py-4 rounded-2xl font-black text-[10px] shadow-xl transition-all active:scale-95 mt-4 ${
+                inviting
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-[#E62C48] text-white shadow-red-100 hover:bg-[#d1263f] hover:-translate-y-0.5'
+              }`}
+            >
+              {inviting ? 'Versturen...' : 'Gebruiker uitnodigen & aanmaken'}
             </button>
           </form>
         </div>
 
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm border-t-4 border-t-red-500">
           <div className="mb-6">
-            <h4 className="font-black uppercase tracking-tight text-slate-800 text-sm">Nieuw Team</h4>
-            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Breid de organisatie uit</p>
+            <h4 className="font-black text-slate-800 text-sm">Nieuw team</h4>
+            <p className="text-[10px] text-slate-400 font-bold mt-1">Breid de organisatie uit</p>
           </div>
-          <form onSubmit={handleAddTeam} className="space-y-5">
+          <form onSubmit={handleCreateTeam} className="space-y-5">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Team Naam</label>
-              <input 
-                type="text" 
+              <label className={labelClass}>Team naam</label>
+              <input
+                type="text"
                 required
-                placeholder="Bijv. Team Gamma" 
-                value={newTeamName} 
-                onChange={e => setNewTeamName(e.target.value)} 
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-red-100 transition-all" 
+                placeholder="Bijv. Team Gamma"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                className={inputClass}
               />
             </div>
-            <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-slate-200 hover:bg-black transition-all">
-              Team Toevoegen
+            <button
+              type="submit"
+              className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] shadow-xl shadow-slate-200 hover:bg-black transition-all"
+            >
+              Team toevoegen
             </button>
           </form>
         </div>
 
-        <div className="bg-slate-900 p-8 rounded-3xl text-white">
-          <h4 className="font-black uppercase text-xs tracking-[0.2em] text-red-400 mb-6 italic">Team Overzicht</h4>
+        <div className="p-8 rounded-3xl text-white" style={{ backgroundColor: '#074750' }}>
+          <h4 className="font-black text-xs text-[#E62C48] mb-6 italic">Team overzicht</h4>
           <div className="space-y-4">
-            {teams.map(t => (
-              <div key={t.id} className="flex justify-between items-center group">
+            {teams.map((team) => (
+              <div key={team.id} className="flex justify-between items-center group">
                 <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#e72b47] group-hover:scale-150 transition-transform" />
-                  <span className="text-sm font-black uppercase tracking-tight">{t.name}</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#E62C48] group-hover:scale-150 transition-transform" />
+                  <span className="text-sm font-black tracking-tight">{team.name}</span>
                 </div>
                 <span className="text-[10px] font-black bg-white/10 px-2 py-1 rounded text-white/60">
-                  {profiles.filter(p => p.team_id === t.id).length} beller(s)
+                  {profiles.filter((p) => p.team_id === team.id).length} beller(s)
                 </span>
               </div>
             ))}

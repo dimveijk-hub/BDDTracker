@@ -1,7 +1,6 @@
-
 export enum UserRole {
   ADMIN = 'admin',
-  BELLER = 'beller'
+  BELLER = 'beller',
 }
 
 export interface Team {
@@ -9,6 +8,7 @@ export interface Team {
   name: string;
 }
 
+/** Document in `profiles/{auth uid}`. */
 export interface Profile {
   id: string;
   email: string;
@@ -18,13 +18,14 @@ export interface Profile {
 
 export interface Session {
   id: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   status: 'open' | 'closed';
   name: string;
-  quarter: string; // Bijv: "2024-Q1"
+  quarter: string; // bijv. "2026-Q1"
 }
 
 export interface SessionTarget {
+  id?: string;
   session_id: string;
   user_id: string;
   target: number;
@@ -35,13 +36,18 @@ export interface Appointment {
   beller_id: string;
   session_id: string;
   customer_name: string;
-  appointment_date: string;
-  created_at: string;
+  appointment_date: string; // YYYY-MM-DD
+  created_at: string; // ISO timestamp
 }
 
+/** Document `settings/global`. */
 export interface AppSettings {
   active_session_id: string | null;
+  blind_mode_enabled: boolean;
 }
+
+/** Concept-targets voor een nieuwe sessie, document `settings/drafts`. */
+export type DraftTargets = Record<string, { active: boolean; target: number }>;
 
 export interface TeamStats {
   teamName: string;
@@ -49,3 +55,5 @@ export interface TeamStats {
   totalTarget: number;
   progress: number;
 }
+
+export type DashboardFilter = 'laatste' | 'kwartaal';

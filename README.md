@@ -1,20 +1,37 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# BDD Tracker (SalesWise Business Development Day)
 
-# Run and deploy your AI Studio app
+Live dashboard waarmee bellers tijdens een Business Development Day afspraken registreren en admins sessies,
+targets en resultaten beheren. React 19 + TypeScript + Vite, Firebase (Auth + Firestore), Recharts, Tailwind (CDN).
 
-This contains everything you need to run your app locally.
+Productie: https://bdd.saleswise.eu (statische build via FTP). Zie [RECONSTRUCTION.md](RECONSTRUCTION.md) voor de
+herkomst van deze broncode.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1GC6rq_9efB5iYtIOf6OesjrsLgBs9Gwj
+## Lokaal draaien
 
-## Run Locally
+```bash
+npm install
+npm run dev:demo   # in-memory demo, geen Firebase nodig (admin@saleswise.eu / mark.visser@saleswise.eu, elk wachtwoord)
+npm run dev        # echte Firebase-backend (productiedata!)
+npm run typecheck
+npm run build      # output in dist/
+```
 
-**Prerequisites:**  Node.js
+> `npm run dev` praat met het **productie**-Firebase-project `saleswisetracker`. Gebruik voor experimenten liever
+> `dev:demo` of een eigen test-project (config in `firebase.ts`).
 
+## Opbouw
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+| Pad | Inhoud |
+|---|---|
+| `App.tsx` | Auth-gate, live Firestore-subscriptions, dashboard-logica, navigatie |
+| `components/` | `DashboardStats`, `AppointmentForm`, `AdminPanel` (sessies/targets/blind mode), `Leaderboard`, `AppointmentLog`, `ResultsDashboard`, `OrganizationPanel` (gebruikers/teams), `Login` |
+| `services/firestore.ts` | Alle Firestore/Auth-aanroepen |
+| `services/demo.ts` | Zelfde API in-memory (alleen `dev:demo`) |
+| `contexts/AuthContext.tsx` | Ingelogde gebruiker + profiel (`profiles/{uid}`) |
+
+Firestore-collecties: `teams`, `profiles` (doc-id = Auth uid), `sessions`, `session_targets`, `appointments`,
+`settings/global` (`active_session_id`, `blind_mode_enabled`) en `settings/drafts` (concept-targets).
+
+## Deploy
+
+`npm run build`, daarna de **inhoud** van `dist/` (`index.html`, `logo.png`, `assets/`) naar de FTP-root uploaden.
