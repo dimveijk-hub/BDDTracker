@@ -8,7 +8,10 @@
     "dev:demo": "vite --mode demo",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:staging": "vite --mode staging",
+    "build:staging": "vite build --mode staging --outDir dist-staging",
+    "seed": "node scripts/seed.mjs"
   },
   "dependencies": {
     "firebase": "^12.0.0",
@@ -21,6 +24,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "firebase-admin": "^14.5.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

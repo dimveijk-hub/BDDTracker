@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './services';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { isTestEnvironment } from './firebase';
 import {
   type Appointment,
   type AppSettings,
@@ -472,6 +473,11 @@ const Gate: React.FC = () => {
 
 const App: React.FC = () => (
   <AuthProvider>
+    {isTestEnvironment && (
+      <div className="fixed bottom-3 right-3 z-[100] bg-slate-900 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
+        TESTOMGEVING
+      </div>
+    )}
     <Gate />
   </AuthProvider>
 );

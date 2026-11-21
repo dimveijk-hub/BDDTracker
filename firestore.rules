@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// VOORSTEL voor het TEST-project, afgeleid uit wat de app doet. De regels van productie staan in de
+// Firebase Console en zijn niet bekend: vergelijk ze met dit bestand voordat je iets overzet.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Profiel van de ingelogde gebruiker + alle profielen leesbaar (namen in dashboards en ranglijsten).
+    match /profiles/{userId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /teams/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /sessions/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /session_targets/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Bellers mogen alleen op eigen naam registreren; wijzigen/verwijderen kan alleen een admin.
+    match /appointments/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.beller_id == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // settings/global (actieve sessie, blind mode) en settings/drafts (concept-targets)
+    match /settings/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

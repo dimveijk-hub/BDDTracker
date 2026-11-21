@@ -25,3 +25,6 @@ dist-ssr
 
 node_modules.nosync
 .env.local
+dist-staging
+scripts/*.json
+*-firebase-adminsdk-*.json
